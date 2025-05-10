@@ -41,9 +41,9 @@ export default function SliderControl({
   return (
     <>
       <div>
-        <div className="flex justify-between mb-1">
-          <Label className="text-zinc-400 text-xs">{label}</Label>
-          <span className="text-zinc-400 text-xs">{formatValue(value)}</span>
+        <div className="flex justify-between mb-3">
+          <Label className="text-zinc-200 text-sm">{label}</Label>
+          <span className="text-zinc-200 text-sm">{formatValue(value)}</span>
         </div>
         <Slider
           min={min}
@@ -52,9 +52,6 @@ export default function SliderControl({
           step={step}
           value={[value]}
           onValueChange={(value) => onChange(value[0])}
-        //   className={`${
-        //     color ? `bg-${color}-500` : "bg-zinc-700"
-        //   } rounded-md h-2`}
         />
       </div>
     </>

@@ -2,7 +2,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Power, Activity, Settings, Battery } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
@@ -14,7 +13,7 @@ import SliderControl from "./SliderControl";
 
 export default function ControlTabs() {
   return (
-    <Tabs defaultValue="output" className="w-full">
+    <Tabs defaultValue="output" className="w-full min-h-[600px]">
       <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto p-1 rounded-lg">
         <TabsTrigger value="output" className="rounded">
           Output Data
@@ -87,9 +86,7 @@ function SystemTab() {
     inverterEfficiency,
     setInverterEfficiency,
     wiringLosses,
-    setWiringLosses,
-    batteryCapacity,
-    batteryCharge,
+    setWiringLosses
   } = useSolarStore();
 
   return (

@@ -110,7 +110,6 @@ export default function DaySimulationSlider() {
 
   // Get a description of the time of day
   const getTimeOfDay = () => {
-    if (timeValue < 8) return "Early Morning";
     if (timeValue < 11) return "Morning";
     if (timeValue >= 11 && timeValue < 13) return "Noon";
     if (timeValue < 16) return "Afternoon";

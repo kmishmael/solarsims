@@ -428,7 +428,7 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         get().updateSimulation(0);
     },
     setPanelEfficiency: (value) => {
-        set({ panelEfficiency: Math.min(0.4, Math.max(0.05, value)) });
+        set({ panelEfficiency: Math.min(0.5, Math.max(0.05, value)) });
         get().updateSimulation(0);
     },
     setPanelAngle: (value) => {

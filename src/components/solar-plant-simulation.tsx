@@ -91,7 +91,6 @@ export default function SolarPlantSimulation() {
       <Header />
       <StatusAlerts />
       <MetricsDashboard />
-      <SecondaryMetrics />
       <VisualizationArea />
       <ControlTabs />
     </div>

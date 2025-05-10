@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import SolarArrayVisualization from "./solar-array-visualization";
 import { useSolarStore } from "@/lib/engine";
+import DaySimulationSlider from "./day-simulation-slider";
 
 export default function VisualizationArea() {
   const {
@@ -53,7 +54,7 @@ export default function VisualizationArea() {
               </div>
             </div>
             <div className="aspect-video bg-background rounded-lg overflow-hidden border">
-            {/* For the sake of memory, we'll use like 20 panels */}
+              {/* For the sake of memory, we'll use like 20 panels */}
               <SolarArrayVisualization
                 panelCount={20}
                 panelAngle={panelAngle}
@@ -69,7 +70,10 @@ export default function VisualizationArea() {
       </div>
 
       <div>
-        <Card className="bg-card h-full">
+        <div className="mb-3">
+          <DaySimulationSlider />
+        </div>
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="mb-4">
               <h3 className="text-lg font-medium">Environmental Conditions</h3>
@@ -162,8 +166,6 @@ export default function VisualizationArea() {
             </div>
           </CardContent>
         </Card>
-
-        <DaySimulationCard />
       </div>
     </div>
   );
@@ -223,67 +225,8 @@ function SliderControl({
         step={step}
         value={[value]}
         onValueChange={(value) => onChange(value[0])}
-//className={`[&>span]:bg-${color}-500`}
+        //className={`[&>span]:bg-${color}-500`}
       />
     </div>
-  );
-}
-
-function DaySimulationCard() {
-  const { currentTime, sunIntensity, cloudCover, updateSimulation } =
-    useSolarStore();
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  return (
-    <Card className="bg-card">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center">
-            <Sun className="h-5 w-5 text-amber-400 mr-2" />
-            <span className="text-muted-foreground font-medium">
-              Day Simulation
-            </span>
-          </div>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Sunrise</span>
-              <span className="text-xs text-muted-foreground">Noon</span>
-              <span className="text-xs text-muted-foreground">Sunset</span>
-            </div>
-            <Slider
-              min={6}
-              max={18}
-              step={0.25}
-              value={[currentTime.getHours() + currentTime.getMinutes() / 60]}
-              onValueChange={(value) => {
-                const hours = Math.floor(value[0]);
-                const minutes = Math.floor((value[0] - hours) * 60);
-                const newTime = new Date();
-                newTime.setHours(hours, minutes, 0, 0);
-
-                const currentStoreTime = currentTime;
-                const deltaHours =
-                  (newTime.getTime() - currentStoreTime.getTime()) /
-                  (1000 * 60 * 60);
-                updateSimulation(deltaHours);
-              }}
-              className="[&>span]:bg-amber-500"
-            />
-            <div className="text-center mt-2 text-xl font-bold">
-              {formatTime(currentTime)}
-            </div>
-            <div className="text-center text-xs text-muted-foreground">
-              Current sun intensity:{" "}
-              {(sunIntensity * (1 - cloudCover)).toFixed(0)} W/m²
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

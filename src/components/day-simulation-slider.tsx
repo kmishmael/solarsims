@@ -322,7 +322,7 @@ export default function DaySimulationSlider() {
           <div className="bg-zinc-800/50 rounded-lg p-2">
             <div className="text-xs text-zinc-400">Solar Intensity</div>
             <div className="text-lg font-medium text-white flex items-center">
-              <div className="flex-1">{getSunIntensityPercent()}%</div>
+              <div className="flex-1">{Math.round((sunIntensity / MAX_INTENSITY) * 100)}%</div>
               <div
                 className="h-2 w-2 rounded-full ml-1"
                 style={{
@@ -359,7 +359,7 @@ export default function DaySimulationSlider() {
               Current Solar Irradiance
             </div>
             <div className="text-xl font-semibold text-white">
-              {Math.round(effectiveSunIntensity)} W/m²
+              {Math.round(sunIntensity)} W/m²
             </div>
             <div className="text-xs text-zinc-500">
               {cloudCover > 0.1

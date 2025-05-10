@@ -41,10 +41,11 @@ export default function MetricsDashboard() {
           (sunIntensity / 1000) * 100
         )}
         progressColor="from-amber-600 to-amber-400"
+        visible={cloudCover <= 0.3}
         subtext={
           cloudCover > 0.3
             ? `Reduced by clouds (${(cloudCover * 100).toFixed(0)}%)`
-            : null
+            : `  `
         }
       />
       <MetricCard
@@ -85,6 +86,7 @@ function MetricCard({
   unit,
   progressValue,
   progressColor,
+  visible = true,
   danger = false,
   subtext,
 }: {
@@ -94,6 +96,7 @@ function MetricCard({
   unit: string;
   progressValue: number;
   progressColor: string;
+  visible?: boolean;
   danger?: boolean;
   subtext?: string;
 }) {
@@ -117,7 +120,7 @@ function MetricCard({
             {value}
           </div>
           <div className="text-muted-foreground text-sm">{unit}</div>
-          {subtext && (
+          {visible && subtext && (
             <div className="text-xs text-muted-foreground mt-1">{subtext}</div>
           )}
         </div>

@@ -16,10 +16,11 @@ function calculateSolarOutput({
     efficiency,
     angleEfficiency,
 }: SolarOutputParams): number {
-    // Calculate total panel area
+
+    //  total panel area
     const totalArea = panelCount * panelArea
 
-    // Calculate raw power based on solar intensity and area
+    // raw power based on solar intensity and area
     const rawPower = sunIntensity * totalArea
 
     // Apply efficiency factors
@@ -175,12 +176,12 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         const {
             currentTime, panelCount, panelEfficiency, panelAngle, trackerEnabled,
             temperature, windSpeed, dustAccumulation,
-            inverterEfficiency, wiringLosses, batteryCapacity, batteryCharge, effectiveSunIntensity
+            inverterEfficiency, wiringLosses, batteryCapacity, batteryCharge, sunIntensity
         } = state;
 
         // Calculate effective panel angle if tracking is enabled
         let effectivePanelAngle = panelAngle;
-        if (trackerEnabled && effectiveSunIntensity > 0) {
+        if (trackerEnabled && sunIntensity > 0) {
             // Get current sun position from time
             const hour = currentTime.getHours() + currentTime.getMinutes() / 60;
             let sunAltitude = 0;
@@ -230,7 +231,7 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         const rawOutput = calculateSolarOutput({
             panelCount,
             panelArea,
-            sunIntensity: effectiveSunIntensity,
+            sunIntensity: sunIntensity,
             efficiency: effectiveEfficiency,
             angleEfficiency,
         });
@@ -249,8 +250,8 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         }
 
         // Calculate overall system efficiency
-        const theoreticalMax = effectiveSunIntensity > 0 ?
-            (panelCount * panelArea * effectiveSunIntensity) / 1000 : 0.00001;
+        const theoreticalMax = sunIntensity > 0 ?
+            (panelCount * panelArea * sunIntensity) / 1000 : 0.00001;
         const overallEfficiency = (finalOutput / theoreticalMax) * 100;
 
         // Create new time object for history if advancing time

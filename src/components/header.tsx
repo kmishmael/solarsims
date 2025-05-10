@@ -10,7 +10,7 @@ export default function Header() {
     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
       <div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-500 to-cyan-400 bg-clip-text text-transparent">
-          Solar Power Plant Simulation - {sunIntensity} W/m² - {effectiveSunIntensity} W/m²
+          Solar Power Plant Simulation
         </h1>
         <p className="text-muted-foreground">
           Advanced physics-based simulation for electrical engineering

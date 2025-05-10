@@ -19,6 +19,7 @@ export default function SolarPlantSimulation() {
     updateSimulation,
     setPanelCount,
     setCurrentTime,
+    setSunIntensity,
   } = useSolarStore();
 
   const animationRef = useRef<number | null>(null);
@@ -35,6 +36,8 @@ export default function SolarPlantSimulation() {
     // Set a default time (noon) for better initial visualization
     const defaultTime = new Date();
     defaultTime.setHours(12, 0, 0, 0);
+
+    setSunIntensity(1000); // Set default sun intensity
     setCurrentTime(defaultTime);
 
     // Initial calculation with no time advancement

@@ -1,9 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Sun, Cloud, Battery } from "lucide-react";
 import { useSolarStore } from "@/lib/engine";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function DaySimulationSlider() {
   const {
@@ -12,10 +19,15 @@ export default function DaySimulationSlider() {
     cloudCover,
     sunIntensity,
     setCurrentTime,
+    setSunIntensity,
   } = useSolarStore();
 
   // Local state to track the slider value
   const [timeValue, setTimeValue] = useState(12);
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [powerDistributionData, setPowerDistributionData] = useState([]);
+
+  const MAX_INTENSITY = 1000;
 
   // Initialize time value from the store
   useEffect(() => {
@@ -23,7 +35,7 @@ export default function DaySimulationSlider() {
     const hour = currentTime.getHours();
     const minutes = currentTime.getMinutes();
     const decimalTime = hour + minutes / 60;
-    
+
     // Clamp to 6-18 range
     const clampedTime = Math.max(6, Math.min(18, decimalTime));
     setTimeValue(clampedTime);
@@ -36,10 +48,35 @@ export default function DaySimulationSlider() {
     return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
   };
 
-  // Handle slider change
-  const handleTimeChange = (value: any) => {
-    const newTimeValue = value[0];
+  // Calculate the raw sun intensity based on the time of day
+  const calculateRawIntensity = (time: number) => {
+    // Normalized time (0 at sunrise, 1 at sunset)
+    const normalizedTime = (time - 6) / 12;
+
+    // Sin curve gives us 0 at sunrise/sunset, 1 at noon
+    const intensityFactor = Math.sin(normalizedTime * Math.PI);
+
+    // Scale to max intensity
+    return Math.max(0, Math.round(intensityFactor * MAX_INTENSITY));
+  };
+
+  // Update time and sun intensity together
+  const updateTimeAndIntensity = useCallback((newTimeValue) => {
     setTimeValue(newTimeValue);
+
+    // Find the closest data point in our distribution data
+    const closestPoint = powerDistributionData.reduce((closest, point) => {
+      return Math.abs(point.time - newTimeValue) < Math.abs(closest.time - newTimeValue)
+        ? point
+        : closest;
+    }, powerDistributionData[0] || { time: 12, power: 0 });
+
+    // Calculate the base sun intensity without cloud cover (reverse the cloud factor)
+   // const staticCloudFactor = 0.2;
+    const baseIntensity = closestPoint.power// / (1 - staticCloudFactor);
+    
+    // Set the sun intensity in the store
+    setSunIntensity(Math.max(0, Math.round(baseIntensity)));
 
     // Create a new date object with the selected time
     const newDate = new Date();
@@ -49,8 +86,19 @@ export default function DaySimulationSlider() {
 
     // Update the store time
     setCurrentTime(newDate);
-    
-    // The current point on the curve will be updated by the useEffect
+  }, [powerDistributionData, setCurrentTime, setSunIntensity]);
+
+  // Handle slider change
+  const handleTimeChange = (value: any) => {
+    const newTimeValue = value[0];
+    updateTimeAndIntensity(newTimeValue);
+  };
+
+  // Handle chart click
+  const handleChartClick = () => {
+    if (hoveredPoint) {
+      updateTimeAndIntensity(hoveredPoint.time);
+    }
   };
 
   // Calculate sun position for visual representation
@@ -71,15 +119,10 @@ export default function DaySimulationSlider() {
 
   // Calculate relative sun intensity as percentage
   const getSunIntensityPercent = () => {
-    // Max sun intensity is at noon (100%)
-    const maxPossibleIntensity = sunIntensity;
-    const currentIntensity = effectiveSunIntensity;
-    return Math.round((currentIntensity / maxPossibleIntensity) * 100);
+    // Now using the direct sun intensity from the store
+    return Math.round((effectiveSunIntensity / MAX_INTENSITY) * 100);
   };
 
-  // Generate a static solar power distribution curve
-  const [powerDistributionData, setPowerDistributionData] = useState([]);
-  
   // Generate the static power curve on component mount only
   useEffect(() => {
     const data = [];
@@ -87,30 +130,39 @@ export default function DaySimulationSlider() {
       // Calculate power based on a bell curve peaking at noon
       const normalizedHour = (hour - 6) / 12;
       const baseIntensity = Math.sin(normalizedHour * Math.PI) * sunIntensity;
-      
+
       // Apply a consistent cloud factor to create a realistic but static curve
       const staticCloudFactor = 0.2;
-      const effectiveIntensity = baseIntensity * (1 - staticCloudFactor);
-      
+      const effectiveIntensity = baseIntensity// * (1 - staticCloudFactor);
+
       data.push({
         time: hour,
         power: Math.max(0, Math.round(effectiveIntensity)),
-        current: false // Will be updated separately
+        current: false, // Will be updated separately
       });
     }
     setPowerDistributionData(data);
-  }, [sunIntensity]); // Only regenerate if sunIntensity changes
-  
+  }, []); // Only regenerate if sunIntensity changes
+
   // Update the current point on the curve
   useEffect(() => {
     if (powerDistributionData.length > 0) {
-      const updatedData = powerDistributionData.map(point => ({
+      const updatedData = powerDistributionData.map((point) => ({
         ...point,
-        current: Math.abs(point.time - timeValue) < 0.125 // Mark closest point as current
+        current: Math.abs(point.time - timeValue) < 0.125, // Mark closest point as current
       }));
       setPowerDistributionData(updatedData);
     }
   }, [timeValue]);
+
+  // Track mouse movement for clickable chart
+  const handleMouseMove = (chartState: any) => {
+    if (chartState.isTooltipActive && chartState.activePayload) {
+      setHoveredPoint(chartState.activePayload[0].payload);
+    } else {
+      setHoveredPoint(null);
+    }
+  };
 
   // Get color class based on power level
   const getPowerLevelColor = () => {
@@ -125,21 +177,26 @@ export default function DaySimulationSlider() {
     if (active && payload && payload.length) {
       const isCurrent = payload[0].payload.current;
       return (
-        <div className={`p-2 rounded border text-xs ${
-          isCurrent 
-            ? "bg-amber-900/60 border-amber-500" 
-            : "bg-zinc-800 border-zinc-700"
-        }`}>
-          <p className="text-white">{`Time: ${formatTime(payload[0].payload.time)}`}</p>
+        <div
+          className={`p-2 rounded border text-xs ${
+            isCurrent
+              ? "bg-amber-900/60 border-amber-500"
+              : "bg-zinc-800 border-zinc-700"
+          }`}
+        >
+          <p className="text-white">{`Time: ${formatTime(
+            payload[0].payload.time
+          )}`}</p>
           <p className="text-amber-400">{`Power: ${payload[0].value} W/m²`}</p>
-          {isCurrent && <p className="text-white font-semibold mt-1">Current Position</p>}
+          {isCurrent && (
+            <p className="text-white font-semibold mt-1">Current Position</p>
+          )}
+          <p className="text-zinc-400 mt-1 text-xs">Click to select this time</p>
         </div>
       );
     }
     return null;
   };
-
-  // Use the static data instead of generating it on each render
 
   return (
     <Card className="bg-zinc-900 border-zinc-800">
@@ -147,7 +204,9 @@ export default function DaySimulationSlider() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
             <Sun className="h-5 w-5 text-amber-400 mr-2" />
-            <span className="text-zinc-300 font-medium">Solar Energy Simulator</span>
+            <span className="text-zinc-300 font-medium">
+              Solar Energy Simulator
+            </span>
           </div>
           <div className="flex items-center">
             {cloudCover > 0.5 && (
@@ -159,56 +218,65 @@ export default function DaySimulationSlider() {
           </div>
         </div>
 
-        {/* Power Distribution Curve */}
-        <div className="h-40 w-full mb-4 bg-zinc-800/50 rounded-lg p-2">
-          <div className="text-xs text-zinc-400 mb-1">Solar Power Distribution</div>
+        {/* Power Distribution Curve - now with onClick */}
+        <div 
+          className="h-40 w-full mb-4 bg-zinc-800/50 rounded-lg p-2 cursor-pointer" 
+          onClick={handleChartClick}
+        >
+          <div className="text-xs text-zinc-400 mb-1 flex justify-between">
+            <span>Solar Intensity Distribution</span>
+            <span className="text-zinc-500 italic">Click on chart to select time</span>
+          </div>
           <ResponsiveContainer width="100%" height="90%">
-            <AreaChart data={powerDistributionData}>
+            <AreaChart 
+              data={powerDistributionData}
+              onMouseMove={handleMouseMove}
+            >
               <defs>
                 <linearGradient id="powerGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.8} />
                   <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <XAxis 
-                dataKey="time" 
-                tick={{fontSize: 10, fill: '#a1a1aa'}} 
+              <XAxis
+                dataKey="time"
+                tick={{ fontSize: 10, fill: "#a1a1aa" }}
                 tickFormatter={formatTime}
                 ticks={[6, 9, 12, 15, 18]}
                 stroke="#52525b"
               />
-              <YAxis 
-                hide={true} 
-                domain={[0, 'dataMax + 20']} 
+              <YAxis hide={true} domain={[0, "dataMax + 20"]} />
+              <Tooltip
+                content={<CustomTooltip active={undefined} payload={undefined} />}
+                cursor={{ stroke: "#f59e0b", strokeDasharray: "3 3" }}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Area 
-                type="monotone" 
-                dataKey="power" 
-                stroke="#f59e0b" 
-                fill="url(#powerGradient)" 
-                dot={(props) => {
+              <Area
+                type="monotone"
+                dataKey="power"
+                stroke="#f59e0b"
+                fill="url(#powerGradient)"
+                dot={(props: any) => {
                   const { cx, cy, payload } = props;
                   // Always return null for most points, except the current one
                   if (!payload.current) return null;
-                  
+
                   // Render a more prominent marker for the current point
                   return (
                     <>
-                      <circle 
-                        cx={cx} 
-                        cy={cy} 
-                        r={6} 
-                        fill="#f59e0b" 
-                        stroke="#fff" 
-                        strokeWidth={2} 
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={6}
+                        fill="#f59e0b"
+                        stroke="#fff"
+                        strokeWidth={2}
                       />
-                      <circle 
-                        cx={cx} 
-                        cy={cy} 
-                        r={12} 
-                        fill="none" 
-                        stroke="#f59e0b" 
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={12}
+                        fill="none"
+                        stroke="#f59e0b"
                         strokeWidth={1}
                         opacity={0.6}
                       />
@@ -223,12 +291,6 @@ export default function DaySimulationSlider() {
         {/* Sun path visualization */}
         <div className="relative h-10 mb-3">
           <div className="absolute w-full h-0.5 bg-zinc-700 bottom-0 rounded-full"></div>
-          <div
-            className="absolute bottom-0 -ml-3 transform -translate-x-1/2"
-            style={{ left: `${getSunPosition()}%` }}
-          >
-            <Sun className="h-6 w-6 text-amber-400" />
-          </div>
           <div className="absolute bottom-2 left-0 text-xs text-zinc-500">
             6 AM
           </div>
@@ -249,6 +311,7 @@ export default function DaySimulationSlider() {
           className="bg-amber-500"
         />
 
+        {/* Rest of the component remains the same */}
         <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="bg-zinc-800/50 rounded-lg p-2">
             <div className="text-xs text-zinc-400">Time of Day</div>
@@ -292,21 +355,29 @@ export default function DaySimulationSlider() {
         {/* Solar panel power generation status */}
         <div className="mt-4 p-3 rounded-lg flex items-center justify-between bg-zinc-800/50">
           <div>
-            <div className="text-xs text-zinc-400">Current Solar Irradiance</div>
+            <div className="text-xs text-zinc-400">
+              Current Solar Irradiance
+            </div>
             <div className="text-xl font-semibold text-white">
               {Math.round(effectiveSunIntensity)} W/m²
+            </div>
+            <div className="text-xs text-zinc-500">
+              {cloudCover > 0.1
+                ? `${Math.round(sunIntensity)} W/m² without cloud cover`
+                : null}
             </div>
           </div>
           <div className="flex items-center">
             <Battery className={`h-6 w-6 mr-2 ${getPowerLevelColor()}`} />
             <div className="text-right">
               <div className={`text-lg font-bold ${getPowerLevelColor()}`}>
-                {getSunIntensityPercent() > 70 ? "Optimal" : 
-                 getSunIntensityPercent() > 40 ? "Moderate" : "Low"}
+                {getSunIntensityPercent() > 70
+                  ? "Optimal"
+                  : getSunIntensityPercent() > 40
+                  ? "Moderate"
+                  : "Low"}
               </div>
-              <div className="text-xs text-zinc-400">
-                Power Generation
-              </div>
+              <div className="text-xs text-zinc-400">Power Generation</div>
             </div>
           </div>
         </div>

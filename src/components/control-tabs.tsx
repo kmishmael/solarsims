@@ -118,7 +118,7 @@ function SystemTab() {
               value={panelEfficiency}
               onChange={setPanelEfficiency}
               min={0.1}
-              max={0.3}
+              max={0.5}
               step={0.01}
               formatValue={(val: any) => `${(val * 100).toFixed(1)}%`}
               color="emerald"

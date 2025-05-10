@@ -4,13 +4,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useSolarStore } from "@/lib/engine";
 
 export default function Header() {
-  const { isRunning, setIsRunning, simulationSpeed, setSimulationSpeed, resetSimulation, exportData } = useSolarStore();
+  const { isRunning, setIsRunning, simulationSpeed, sunIntensity, effectiveSunIntensity ,setSimulationSpeed, resetSimulation, exportData } = useSolarStore();
 
   return (
     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
       <div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-500 to-cyan-400 bg-clip-text text-transparent">
-          Solar Power Plant Simulation
+          Solar Power Plant Simulation - {sunIntensity} W/m² - {effectiveSunIntensity} W/m²
         </h1>
         <p className="text-muted-foreground">
           Advanced physics-based simulation for electrical engineering

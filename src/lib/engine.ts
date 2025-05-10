@@ -1,5 +1,35 @@
 import { create } from 'zustand';
-import { calculateSolarOutput } from '@/lib/solar-calculations';
+
+// Use the provided calculateSolarOutput function
+interface SolarOutputParams {
+    panelCount: number
+    panelArea: number
+    sunIntensity: number
+    efficiency: number
+    angleEfficiency: number
+}
+
+function calculateSolarOutput({
+    panelCount,
+    panelArea,
+    sunIntensity,
+    efficiency,
+    angleEfficiency,
+}: SolarOutputParams): number {
+    // Calculate total panel area
+    const totalArea = panelCount * panelArea
+
+    // Calculate raw power based on solar intensity and area
+    const rawPower = sunIntensity * totalArea
+
+    // Apply efficiency factors
+    const outputPower = rawPower * efficiency * angleEfficiency
+
+    // Convert to kilowatts
+    const outputKW = outputPower / 1000
+
+    return Math.max(0, outputKW)
+}
 
 interface SolarState {
     // Simulation control
@@ -39,11 +69,15 @@ interface SolarState {
     efficiencyHistory: { time: Date; value: number }[];
 
     // Weather pattern
-    weatherPattern: string;    // Derived states
+    weatherPattern: string;
+
+    // Derived states
     isTemperatureHigh: boolean;
     isBatteryLow: boolean;
     isDustHigh: boolean;
-    effectiveSunIntensity: number;// Actions
+    effectiveSunIntensity: number;
+
+    // Actions
     setIsRunning: (value: boolean) => void;
     setSimulationSpeed: (value: number) => void;
     setCurrentTime: (time: Date) => void;
@@ -111,23 +145,18 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
     efficiencyHistory: [],
 
     // Weather pattern - initial value
-    weatherPattern: "sunny",    // Derived states
+    weatherPattern: "sunny",
+
+    // Derived states
     get isTemperatureHigh() { return get().temperature > 35; },
     get isBatteryLow() { return get().batteryCharge / get().batteryCapacity < 0.2; },
     get isDustHigh() { return get().dustAccumulation > 0.3; },
+    // Removed effectiveSunIntensity getter as it's now calculated directly in updateSimulation
+    // This helps avoid caching issues and ensures we always use fresh calculations
     get effectiveSunIntensity() {
         const state = get();
-        const hour = state.currentTime.getHours() + state.currentTime.getMinutes() / 60;
-
-        // Day/night cycle affects sun intensity (simplified model)
-        let timeBasedIntensity = 0;
-        if (hour > 6 && hour < 18) {
-            // Parabolic curve peaking at noon
-            timeBasedIntensity = state.sunIntensity * (1 - Math.pow((hour - 12) / 6, 2));
-        }
-
-        // Apply weather effects
-        return timeBasedIntensity * (1 - state.cloudCover);
+        // Use the raw sun intensity and only reduce by cloud cover
+        return Math.max(0, state.sunIntensity * (1 - state.cloudCover));
     },
 
     // Actions
@@ -139,39 +168,55 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
 
         // Recalculate the simulation state based on new time
         get().updateSimulation(0);
-    }, updateSimulation: (deltaHours) => {
+    },
+
+    updateSimulation: (deltaHours) => {
         const state = get();
         const {
             currentTime, panelCount, panelEfficiency, panelAngle, trackerEnabled,
-            sunIntensity, temperature, windSpeed, dustAccumulation,
-            inverterEfficiency, wiringLosses, batteryCapacity, batteryCharge
+            temperature, windSpeed, dustAccumulation,
+            inverterEfficiency, wiringLosses, batteryCapacity, batteryCharge, effectiveSunIntensity
         } = state;
-
-        // Calculate sun position based on time of day
-        const hour = currentTime.getHours() + currentTime.getMinutes() / 60;
-
-        // Get the effective intensity from the derived state
-        const effectiveIntensity = state.effectiveSunIntensity;
 
         // Calculate effective panel angle if tracking is enabled
         let effectivePanelAngle = panelAngle;
-        if (trackerEnabled) {
-            // Simple tracking algorithm - follow the sun
-            const sunAngle = 90 - Math.abs(((hour - 12) / 12) * 90);
-            effectivePanelAngle = Math.max(10, Math.min(80, sunAngle));
+        if (trackerEnabled && effectiveSunIntensity > 0) {
+            // Get current sun position from time
+            const hour = currentTime.getHours() + currentTime.getMinutes() / 60;
+            let sunAltitude = 0;
+            if (hour >= 6 && hour <= 18) {
+                sunAltitude = 90 * Math.sin(Math.PI * (hour - 6) / 12);
+            }
+
+            // Simple tracking algorithm - follow the sun's elevation
+            effectivePanelAngle = Math.max(10, Math.min(80, 90 - sunAltitude));
         }
 
         // Calculate angle of incidence between sun and panels
-        const sunAltitude = 90 - Math.abs(((hour - 12) / 6) * 90);
-        const angleOfIncidence = Math.abs(sunAltitude - effectivePanelAngle);
-        const angleEfficiency = Math.cos((angleOfIncidence * Math.PI) / 180);
+        // Use the time to determine sun position for angle calculation
+        const hour = currentTime.getHours() + currentTime.getMinutes() / 60;
+        let sunAltitude = 0;
+        if (hour >= 6 && hour <= 18) {
+            // Sinusoidal model for sun elevation throughout the day
+            sunAltitude = 90 * Math.sin(Math.PI * (hour - 6) / 12);
+        }
+
+
+        // Calculate angle of incidence between sun and panels
+        // Important: when sunAltitude is 0 (horizon/night), the panels don't produce
+        const angleOfIncidence = sunAltitude > 0 ?
+            Math.abs(sunAltitude - (90 - effectivePanelAngle)) : 90;
+
+        // Calculate the efficiency factor from the angle of incidence
+        // Cosine of angle of incidence gives the efficiency factor
+        const angleEfficiency = Math.max(0, Math.cos(angleOfIncidence * Math.PI / 180));
 
         // Temperature effect on efficiency (panels lose efficiency as they heat up)
         const tempCoefficient = -0.004; // -0.4% per degree C above 25°C
-        const tempEffect = 1 + tempCoefficient * (temperature - 25);
+        const tempEffect = Math.max(0.7, 1 + tempCoefficient * (temperature - 25));
 
         // Wind cooling effect (higher wind speeds cool panels, improving efficiency)
-        const windCoolingEffect = Math.min(0.02, windSpeed * 0.002);
+        const windCoolingEffect = Math.min(0.03, windSpeed * 0.002);
 
         // Dust accumulation effect
         const dustEffect = 1 - dustAccumulation;
@@ -185,7 +230,7 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         const rawOutput = calculateSolarOutput({
             panelCount,
             panelArea,
-            sunIntensity: effectiveIntensity,
+            sunIntensity: effectiveSunIntensity,
             efficiency: effectiveEfficiency,
             angleEfficiency,
         });
@@ -194,43 +239,45 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         const outputAfterWiringLosses = rawOutput * (1 - wiringLosses);
         const finalOutput = outputAfterWiringLosses * inverterEfficiency;
 
-        // Update battery charge only if time is advancing
-        const energyProduced = finalOutput * deltaHours;
-        let newBatteryCharge = batteryCharge + energyProduced;
+        // Calculate energy produced for this time slice
+        const energyProduced = finalOutput * (deltaHours || 0);
 
-        // Cap battery charge at capacity
-        if (newBatteryCharge > batteryCapacity) {
-            newBatteryCharge = batteryCapacity;
+        // Update battery charge only if time is advancing
+        let newBatteryCharge = batteryCharge;
+        if (deltaHours > 0) {
+            newBatteryCharge = Math.min(batteryCapacity, batteryCharge + energyProduced);
         }
 
         // Calculate overall system efficiency
-        const theoreticalMax = (panelCount * panelArea * state.sunIntensity) / 1000;
-        const overallEfficiency = theoreticalMax > 0 ? (finalOutput / theoreticalMax) * 100 : 0;        // Create new time for history only if time is advancing
-        let newTime = currentTime;
-        if (deltaHours > 0) {
-            newTime = new Date(currentTime);
-            newTime.setSeconds(newTime.getSeconds() + state.simulationSpeed * 60);
-        }
+        const theoreticalMax = effectiveSunIntensity > 0 ?
+            (panelCount * panelArea * effectiveSunIntensity) / 1000 : 0.00001;
+        const overallEfficiency = (finalOutput / theoreticalMax) * 100;
 
-        // Update history for graphs (limit to 100 points)
-        // Only add to history if output changes or time advances
-        const shouldUpdateHistory = deltaHours > 0 || state.outputHistory.length === 0 ||
-            state.outputHistory[state.outputHistory.length - 1].value !== finalOutput;
+        // Create new time object for history if advancing time
+        const newTime = deltaHours > 0 ? new Date(currentTime.getTime() + deltaHours * 3600000) : currentTime;
+
+        // Only add to history if output changes significantly or time advances
+        const shouldUpdateHistory =
+            deltaHours > 0 ||
+            state.outputHistory.length === 0 ||
+            (state.outputHistory.length > 0 &&
+                Math.abs(state.outputHistory[state.outputHistory.length - 1].value - finalOutput) > 0.01);
 
         const newOutputHistory = shouldUpdateHistory
-            ? [...state.outputHistory, { time: newTime, value: finalOutput }].slice(-100)
+            ? [...state.outputHistory, { time: new Date(newTime), value: finalOutput }].slice(-100)
             : state.outputHistory;
 
         const newEfficiencyHistory = shouldUpdateHistory
-            ? [...state.efficiencyHistory, { time: newTime, value: overallEfficiency }].slice(-100)
+            ? [...state.efficiencyHistory, { time: new Date(newTime), value: overallEfficiency }].slice(-100)
             : state.efficiencyHistory;
 
-        // New dust accumulation - only increases when time advances
+        // Only increase dust accumulation if time is advancing
         const newDustAccumulation = deltaHours > 0
             ? Math.min(0.5, state.dustAccumulation + 0.001 * deltaHours)
-            : state.dustAccumulation;        // Only update time-related values if deltaHours is non-zero
+            : state.dustAccumulation;
+
+        // Determine what values to update based on whether time is advancing
         if (deltaHours > 0) {
-            // Update all values including time progression
             set({
                 currentTime: newTime,
                 currentOutput: finalOutput,
@@ -244,7 +291,7 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
                 elapsedHours: state.elapsedHours + deltaHours,
             });
         } else {
-            // Only update the current output state, not time-dependent values
+            // If not advancing time, just update the current output metrics
             set({
                 currentOutput: finalOutput,
                 systemEfficiency: overallEfficiency,
@@ -315,75 +362,123 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
     },
 
     applyWeatherPattern: (pattern) => {
+        let newSettings = {};
+
         switch (pattern) {
             case "sunny":
-                set({
+                newSettings = {
                     weatherPattern: pattern,
                     cloudCover: 0.1,
                     temperature: 30,
                     windSpeed: 3,
                     sunIntensity: 1000
-                });
+                };
                 break;
             case "cloudy":
-                set({
+                newSettings = {
                     weatherPattern: pattern,
                     cloudCover: 0.7,
                     temperature: 22,
                     windSpeed: 8,
                     sunIntensity: 800
-                });
+                };
                 break;
             case "rainy":
-                set({
+                newSettings = {
                     weatherPattern: pattern,
                     cloudCover: 0.9,
                     temperature: 18,
                     windSpeed: 12,
                     sunIntensity: 400
-                });
+                };
                 break;
             case "windy":
-                set({
+                newSettings = {
                     weatherPattern: pattern,
                     cloudCover: 0.3,
                     temperature: 20,
                     windSpeed: 20,
                     sunIntensity: 900
-                });
+                };
                 break;
             case "hot":
-                set({
+                newSettings = {
                     weatherPattern: pattern,
                     cloudCover: 0.1,
                     temperature: 40,
                     windSpeed: 2,
                     sunIntensity: 1100
-                });
+                };
                 break;
+            default:
+                return; // Do nothing for unknown patterns
         }
+
+        // Update state at once to avoid multiple renders
+        set(newSettings);
+
+        // Recalculate simulation with new weather conditions
+        get().updateSimulation(0);
     },
 
-    // Panel configuration setters
-    setPanelCount: (value) => set({ panelCount: value }),
-    setPanelEfficiency: (value) => set({ panelEfficiency: value }),
-    setPanelAngle: (value) => set({ panelAngle: value }),
-    setPanelOrientation: (value) => set({ panelOrientation: value }),
-    setTrackerEnabled: (value) => set({ trackerEnabled: value }),
+    // Panel configuration setters - updated to ensure immediate recalculation
+    setPanelCount: (value) => {
+        set({ panelCount: Math.max(1, value) });
+        get().updateSimulation(0);
+    },
+    setPanelEfficiency: (value) => {
+        set({ panelEfficiency: Math.min(0.4, Math.max(0.05, value)) });
+        get().updateSimulation(0);
+    },
+    setPanelAngle: (value) => {
+        set({ panelAngle: Math.min(90, Math.max(0, value)) });
+        get().updateSimulation(0);
+    },
+    setPanelOrientation: (value) => {
+        set({ panelOrientation: value });
+        get().updateSimulation(0);
+    },
+    setTrackerEnabled: (value) => {
+        set({ trackerEnabled: value });
+        get().updateSimulation(0);
+    },
 
     // Environmental setters
-    setSunIntensity: (value) => set({ sunIntensity: value }),
-    setTemperature: (value) => set({ temperature: value }),
-    setCloudCover: (value) => set({ cloudCover: value }),
-    setWindSpeed: (value) => set({ windSpeed: value }),
-    setDustAccumulation: (value) => set({ dustAccumulation: value }),
+    setSunIntensity: (value) => {
+        set({ sunIntensity: Math.max(0, value) });
+         setTimeout(() => get().updateSimulation(0), 0);
+    },
+    setTemperature: (value) => {
+        set({ temperature: value });
+        get().updateSimulation(0);
+    },
+    setCloudCover: (value) => {
+        set({ cloudCover: Math.min(1, Math.max(0, value)) });
+        get().updateSimulation(0);
+    },
+    setWindSpeed: (value) => {
+        set({ windSpeed: Math.max(0, value) });
+        get().updateSimulation(0);
+    },
+    setDustAccumulation: (value) => {
+        set({ dustAccumulation: Math.min(1, Math.max(0, value)) });
+        get().updateSimulation(0);
+    },
 
     // System configuration setters
-    setInverterEfficiency: (value) => set({ inverterEfficiency: value }),
-    setWiringLosses: (value) => set({ wiringLosses: value }),
+    setInverterEfficiency: (value) => {
+        set({ inverterEfficiency: Math.min(1, Math.max(0.5, value)) });
+        get().updateSimulation(0);
+    },
+    setWiringLosses: (value) => {
+        set({ wiringLosses: Math.min(0.2, Math.max(0, value)) });
+        get().updateSimulation(0);
+    },
     setBatteryCapacity: (value) => set((state) => {
         // When changing battery capacity, adjust current charge proportionally
-        const newCharge = Math.min(value, state.batteryCharge * (value / state.batteryCapacity));
-        return { batteryCapacity: value, batteryCharge: newCharge };
+        const newCapacity = Math.max(1, value);
+        const newCharge = Math.min(newCapacity, state.batteryCharge * (newCapacity / state.batteryCapacity));
+        return { batteryCapacity: newCapacity, batteryCharge: newCharge };
     }),
 }));
+

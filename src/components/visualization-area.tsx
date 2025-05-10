@@ -82,7 +82,7 @@ export default function VisualizationArea() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* <div className="grid grid-cols-2 gap-4 mb-4">
               <WeatherButton
                 pattern="sunny"
                 currentPattern={weatherPattern}
@@ -115,7 +115,7 @@ export default function VisualizationArea() {
                 label="Windy"
                 color="cyan"
               />
-            </div>
+            </div> */}
 
             <div className="space-y-4">
               <SliderControl

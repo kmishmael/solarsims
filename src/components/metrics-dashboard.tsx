@@ -34,11 +34,11 @@ export default function MetricsDashboard() {
       <MetricCard
         icon={<Gauge className="h-5 w-5 text-amber-400" />}
         title="Solar Irradiance"
-        value={effectiveSunIntensity.toFixed(0)}
+        value={sunIntensity.toFixed(0)}
         unit="W/m²"
         progressValue={Math.min(
           100,
-          (effectiveSunIntensity / sunIntensity) * 100
+          (sunIntensity / 1000) * 100
         )}
         progressColor="from-amber-600 to-amber-400"
         subtext={

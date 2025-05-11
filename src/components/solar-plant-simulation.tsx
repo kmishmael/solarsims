@@ -16,6 +16,7 @@ export default function SolarPlantSimulation() {
   const {
     isRunning,
     simulationSpeed,
+    timeAdvancementEnabled,
     updateSimulation,
     setPanelCount,
     setCurrentTime,
@@ -48,8 +49,7 @@ export default function SolarPlantSimulation() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, []);
-  // Main simulation loop
+  }, []); // Main simulation loop
   const runSimulation = (timestamp: number) => {
     if (!isRunning) return;
 
@@ -61,12 +61,15 @@ export default function SolarPlantSimulation() {
     const deltaSeconds = (timestamp - lastFrameTime.current) / 1000;
 
     // Convert to simulation hours based on speed
-    const delta = (deltaSeconds * simulationSpeed) / 3600;
+    // If time advancement is disabled, delta will be zero
+    const delta = timeAdvancementEnabled
+      ? (deltaSeconds * simulationSpeed) / 3600
+      : 0;
 
-    // Only update if enough time has passed (to avoid excessive updates)
-    if (delta > 0.001) {
-      // Minimum time step of 3.6 seconds in simulation time
-      updateSimulation(delta);
+    // Only update if enough time has passed or if we still need to update outputs without time advancement
+    if (delta > 0.001 || (!timeAdvancementEnabled && deltaSeconds > 0.1)) {
+      // Pass delta as 0 if time advancement is disabled
+      updateSimulation(timeAdvancementEnabled ? delta : 0);
       lastFrameTime.current = timestamp;
     }
 

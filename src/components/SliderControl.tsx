@@ -41,7 +41,7 @@ export default function SliderControl({
   return (
     <>
       <div>
-        <div className="flex justify-between mb-3">
+        <div className="flex justify-between mb-4">
           <Label className="text-zinc-200 text-sm">{label}</Label>
           <span className="text-zinc-200 text-sm">{formatValue(value)}</span>
         </div>

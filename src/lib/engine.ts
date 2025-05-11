@@ -36,6 +36,7 @@ interface SolarState {
     // Simulation control
     isRunning: boolean;
     simulationSpeed: number;
+    timeAdvancementEnabled: boolean; // Controls whether time advances automatically
     currentTime: Date;
     elapsedHours: number;
 
@@ -76,11 +77,10 @@ interface SolarState {
     isTemperatureHigh: boolean;
     isBatteryLow: boolean;
     isDustHigh: boolean;
-    effectiveSunIntensity: number;
-
-    // Actions
+    effectiveSunIntensity: number;    // Actions
     setIsRunning: (value: boolean) => void;
     setSimulationSpeed: (value: number) => void;
+    setTimeAdvancementEnabled: (value: boolean) => void;
     setCurrentTime: (time: Date) => void;
     updateSimulation: (deltaHours: number) => void;
     resetSimulation: () => void;
@@ -111,14 +111,15 @@ interface SolarState {
 export const useSolarStore = create<SolarState>()((set, get) => ({
     // Simulation control - initial values
     isRunning: false,
-    simulationSpeed: 1,
+    simulationSpeed: 1, // 30 seconds per simulation second (default)
+    timeAdvancementEnabled: true, // Time advances automatically by default
     currentTime: new Date(),
     elapsedHours: 0,
 
     // Solar panel configuration - initial values
     panelCount: 100,
     panelEfficiency: 0.22,
-    panelAngle: 35,
+    panelAngle: 2,
     panelOrientation: 180,
     trackerEnabled: false,
 
@@ -158,26 +159,57 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         const state = get();
         // Use the raw sun intensity and only reduce by cloud cover
         return Math.max(0, state.sunIntensity * (1 - state.cloudCover));
-    },
-
-    // Actions
+    },    // Actions
     setIsRunning: (value) => set({ isRunning: value }),
     setSimulationSpeed: (value) => set({ simulationSpeed: value }),
+    setTimeAdvancementEnabled: (value) => set({ timeAdvancementEnabled: value }),
     setCurrentTime: (time) => {
         // Update the time without changing the simulation state
         set({ currentTime: time });
 
         // Recalculate the simulation state based on new time
         get().updateSimulation(0);
-    },
-
-    updateSimulation: (deltaHours) => {
+    }, updateSimulation: (deltaHours) => {
+        if (!get().isRunning) return;
         const state = get();
         const {
             currentTime, panelCount, panelEfficiency, panelAngle, trackerEnabled,
-            temperature, windSpeed, dustAccumulation,
-            inverterEfficiency, wiringLosses, batteryCapacity, batteryCharge, sunIntensity
+            temperature, windSpeed, dustAccumulation, timeAdvancementEnabled,
+            inverterEfficiency, wiringLosses, batteryCapacity, batteryCharge, sunIntensity, cloudCover,
+            simulationSpeed
         } = state;
+
+        // Automatic sun intensity calculation when time advancement is enabled
+        let usedSunIntensity = sunIntensity;
+
+        // In auto mode, update the sun intensity based on time
+        if (timeAdvancementEnabled) {
+            const hour = currentTime.getHours() + currentTime.getMinutes() / 60;
+
+            // Only have sun between 6am and 6pm
+            if (hour >= 6 && hour <= 18) {
+                // Normalized time (0 at sunrise, 1 at sunset)
+                const normalizedTime = (hour - 6) / 12;
+
+                // Sin curve gives us 0 at sunrise/sunset, 1 at noon
+                const intensityFactor = Math.sin(normalizedTime * Math.PI);
+
+                // Scale to 1000 W/m² maximum intensity
+                const calculatedIntensity = Math.round(intensityFactor * 1000);
+
+                // If the sun intensity changed significantly, update the store
+                if (Math.abs(calculatedIntensity - sunIntensity) > 10) {
+                    set({ sunIntensity: calculatedIntensity });
+                    usedSunIntensity = calculatedIntensity;
+                }
+            } else {
+                // No sun outside of daylight hours
+                if (sunIntensity > 0) {
+                    set({ sunIntensity: 0 });
+                    usedSunIntensity = 0;
+                }
+            }
+        }
 
         // Calculate effective panel angle if tracking is enabled
         let effectivePanelAngle = panelAngle;
@@ -224,14 +256,16 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
 
         // Calculate effective panel efficiency
         const effectiveEfficiency =
-            panelEfficiency * tempEffect * (1 + windCoolingEffect) * dustEffect;
-
-        // Calculate raw output
+            panelEfficiency * tempEffect * (1 + windCoolingEffect) * dustEffect;        // Calculate raw output
         const panelArea = 1.7; // m² per panel
+
+        // Apply cloud cover to sun intensity
+        const effectiveSunIntensity = usedSunIntensity * (1 - cloudCover);
+
         const rawOutput = calculateSolarOutput({
             panelCount,
             panelArea,
-            sunIntensity: sunIntensity,
+            sunIntensity: effectiveSunIntensity,
             efficiency: effectiveEfficiency,
             angleEfficiency,
         });
@@ -247,15 +281,37 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         let newBatteryCharge = batteryCharge;
         if (deltaHours > 0) {
             newBatteryCharge = Math.min(batteryCapacity, batteryCharge + energyProduced);
+        }        // Calculate overall system efficiency
+        const theoreticalMax = effectiveSunIntensity > 0 ?
+            (panelCount * panelArea * effectiveSunIntensity) / 1000 : 0.00001;
+        const overallEfficiency = (finalOutput / theoreticalMax) * 100;// Create new time object for history if advancing time
+        let newTime;
+        if (deltaHours > 0) {
+            const adjustedDeltaHours = deltaHours * (simulationSpeed * 20);
+
+            newTime = new Date(currentTime.getTime() + adjustedDeltaHours * 3600000);
+
+            // If we cross midnight, reset daily energy (simplified approach)
+            if (newTime.getDate() !== currentTime.getDate()) {
+                state.dailyEnergy = 0;
+            }
+
+            // Keep time between 6am and 6pm for simulation purposes
+            const hours = newTime.getHours();
+
+            // If we go past 6pm, wrap to 6am
+            if (hours >= 18) {
+                newTime.setHours(6, 0, 0, 0);
+                newTime.setDate(newTime.getDate() + 1); // Next day
+            }
+
+            // If we're before 6am, set to 6am
+            if (hours < 6) {
+                newTime.setHours(6, 0, 0, 0);
+            }
+        } else {
+            newTime = currentTime;
         }
-
-        // Calculate overall system efficiency
-        const theoreticalMax = sunIntensity > 0 ?
-            (panelCount * panelArea * sunIntensity) / 1000 : 0.00001;
-        const overallEfficiency = (finalOutput / theoreticalMax) * 100;
-
-        // Create new time object for history if advancing time
-        const newTime = deltaHours > 0 ? new Date(currentTime.getTime() + deltaHours * 3600000) : currentTime;
 
         // Only add to history if output changes significantly or time advances
         const shouldUpdateHistory =
@@ -447,7 +503,7 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
     // Environmental setters
     setSunIntensity: (value) => {
         set({ sunIntensity: Math.max(0, value) });
-         setTimeout(() => get().updateSimulation(0), 0);
+        setTimeout(() => get().updateSimulation(0), 0);
     },
     setTemperature: (value) => {
         set({ temperature: value });

@@ -41,11 +41,11 @@ export default function MetricsDashboard() {
           (sunIntensity / 1000) * 100
         )}
         progressColor="from-amber-600 to-amber-400"
-        visible={cloudCover <= 0.3}
+        visible={cloudCover <= 0.3 ? false : true}
         subtext={
           cloudCover > 0.3
             ? `Reduced by clouds (${(cloudCover * 100).toFixed(0)}%)`
-            : `  `
+            : `I am no`
         }
       />
       <MetricCard
@@ -66,6 +66,8 @@ export default function MetricsDashboard() {
             : "from-red-600 to-red-400"
         }
         danger={isTemperatureHigh}
+        visible={false}
+        subtext={`I am def`}
       />
       <MetricCard
         icon={<Activity className="h-5 w-5 text-emerald-400" />}
@@ -74,6 +76,8 @@ export default function MetricsDashboard() {
         unit="%"
         progressValue={Math.min(100, systemEfficiency)}
         progressColor="from-emerald-600 to-emerald-400"
+        visible={false}
+        subtext={`I am an`}
       />
     </div>
   );
@@ -120,8 +124,8 @@ function MetricCard({
             {value}
           </div>
           <div className="text-muted-foreground text-sm">{unit}</div>
-          {visible && subtext && (
-            <div className="text-xs text-muted-foreground mt-1">{subtext}</div>
+          {subtext && (
+            <div className={`text-xs text-muted-foreground mt-1 ${!visible ? 'opacity-0' : ''}`}>{subtext}</div>
           )}
         </div>
         <div className="h-1 bg-muted">

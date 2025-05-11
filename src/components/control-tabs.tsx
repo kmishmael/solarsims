@@ -10,19 +10,23 @@ import EfficiencyGraph from "./efficiency-graph";
 import SystemDiagram from "./system-diagram";
 import { useSolarStore } from "@/lib/engine";
 import SliderControl from "./SliderControl";
+import PresetsTab from "./presets";
 
 export default function ControlTabs() {
   return (
     <Tabs defaultValue="output" className="w-full min-h-[600px]">
-      <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto p-1 rounded-lg">
-        <TabsTrigger value="output" className="rounded">
+      <TabsList className="flex flex-wrap gap-1 mb-4 sm:gap-2 p-1 rounded-lg">
+        <TabsTrigger value="output" className="rounded flex-1 min-w-[80px] cursor-pointer">
           Output Data
         </TabsTrigger>
-        <TabsTrigger value="system" className="rounded">
+        <TabsTrigger value="system" className="rounded flex-1 min-w-[80px] cursor-pointer">
           System Config
         </TabsTrigger>
-        <TabsTrigger value="advanced" className="rounded">
+        <TabsTrigger value="advanced" className="rounded flex-1 min-w-[80px] cursor-pointer">
           Advanced
+        </TabsTrigger>
+        <TabsTrigger value="presets" className="rounded flex-1 min-w-[80px] cursor-pointer">
+          Presets
         </TabsTrigger>
       </TabsList>
 
@@ -36,6 +40,9 @@ export default function ControlTabs() {
 
       <TabsContent value="advanced" className="mt-6">
         <AdvancedTab />
+      </TabsContent>
+      <TabsContent value="presets" className="mt-6">
+        <PresetsTab />
       </TabsContent>
     </Tabs>
   );
@@ -86,14 +93,14 @@ function SystemTab() {
     inverterEfficiency,
     setInverterEfficiency,
     wiringLosses,
-    setWiringLosses
+    setWiringLosses,
   } = useSolarStore();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card className="bg-card">
         <CardContent className="p-4">
-          <div className="flex items-center mb-4">
+          <div className="flex items-center mb-6">
             <Settings className="h-5 w-5 text-muted-foreground mr-2" />
             <h3 className="text-lg font-medium">Solar Array Configuration</h3>
           </div>
@@ -199,6 +206,7 @@ function AdvancedTab() {
     systemEfficiency,
     elapsedHours,
     exportData,
+    isRunning,
   } = useSolarStore();
 
   return (
@@ -214,9 +222,9 @@ function AdvancedTab() {
             panelEfficiency={panelEfficiency}
             inverterEfficiency={inverterEfficiency}
             wiringLosses={wiringLosses}
-            batteryCharge={batteryCharge}
-            batteryCapacity={batteryCapacity}
             currentOutput={currentOutput}
+            isRunning={isRunning}
+            powerOutput={currentOutput}
           />
         </div>
 

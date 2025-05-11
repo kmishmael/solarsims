@@ -6,7 +6,7 @@ function App() {
   return (
     <>
       <ThemeProvider defaultTheme="dark" storageKey="solar-sim-theme">
-        <main className="min-h-screen bg-[#09090b] text-white">
+        <main className="min-h-screen text-white">
           <SolarPlantSimulation />
         </main>
       </ThemeProvider>

@@ -358,17 +358,60 @@ export const useSolarStore = create<SolarState>()((set, get) => ({
         }
     },
 
-    resetSimulation: () => set({
-        isRunning: false,
-        currentTime: new Date(),
-        elapsedHours: 0,
-        dailyEnergy: 0,
-        totalEnergy: 0,
-        batteryCharge: get().batteryCapacity / 2,
-        dustAccumulation: 0,
-        outputHistory: [],
-        efficiencyHistory: []
-    }),
+    resetSimulation: () => {
+        const {
+            panelCount,
+            panelEfficiency,
+            panelAngle,
+            panelOrientation,
+            trackerEnabled,
+            inverterEfficiency,
+            wiringLosses,
+            batteryCapacity,
+            simulationSpeed,
+            timeAdvancementEnabled
+        } = get();
+
+        set({
+            isRunning: false,
+            simulationSpeed: simulationSpeed, // Keep user's speed setting
+            timeAdvancementEnabled: timeAdvancementEnabled, // Keep time advancement setting
+          //  currentTime: new Date(), // Reset to current time
+            elapsedHours: 0,
+
+            panelCount,
+            panelEfficiency,
+            panelAngle,
+            panelOrientation,
+            trackerEnabled,
+
+            sunIntensity: 1000,
+            temperature: 25,
+            cloudCover: 0.1,
+            windSpeed: 5,
+            dustAccumulation: 0,
+
+            inverterEfficiency,
+            wiringLosses,
+            batteryCapacity,
+            batteryCharge: batteryCapacity / 2, // Reset to half capacity
+
+            currentOutput: 0,
+            dailyEnergy: 0,
+            totalEnergy: 0,
+            systemEfficiency: 0,
+
+            // Reset historical data
+            outputHistory: [],
+            efficiencyHistory: [],
+
+            // Reset weather to default sunny
+            weatherPattern: "sunny"
+        });
+
+        // Update the simulation to calculate initial values
+        setTimeout(() => get().updateSimulation(0), 0);
+    },
 
     cleanPanels: () => set({ dustAccumulation: 0 }),
 

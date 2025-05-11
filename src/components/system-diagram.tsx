@@ -92,21 +92,38 @@ export default function SystemDiagram({
     // Add subtle grid pattern
     drawGrid(ctx, canvas.width / dpr, canvas.height / dpr);
 
-    // Define component positions
-    const padding = 60;
-    const componentWidth = 140;
-    const componentHeight = 70;
-
+    // Get the dimensions
+    const canvasWidth = canvas.width / dpr;
+    const canvasHeight = canvas.height / dpr;
+    
+    // Define component positions for horizontal layout
+    const padding = Math.min(60, canvasWidth / 20); // Responsive padding
+    const availableWidth = canvasWidth - (padding * 2);
+    
+    // Make component size responsive based on available space
+    const componentWidth = Math.min(120, availableWidth / 6); // Ensure components aren't too large
+    const componentHeight = Math.min(70, canvasHeight / 6);
+    
+    // Calculate positions for horizontal layout
+    const centerY = canvasHeight / 2;
+    
+    // Calculate spacing based on available space
+    const totalComponentWidth = componentWidth * 4; // 4 components
+    const remainingSpace = availableWidth - totalComponentWidth;
+    const componentSpacing = remainingSpace / 3; // Space between components
+    
+    // Position components horizontally in a line
     const solarArrayX = padding;
-    const solarArrayY = padding;
-
-    const inverterCenterX = canvas.width / (2 * dpr);
-    const inverterX = inverterCenterX - componentWidth / 2;
-    const inverterY = padding;
-
-    const loadCenterX = canvas.width / (2 * dpr);
-    const loadX = loadCenterX - componentWidth / 2;
-    const loadY = canvas.height / dpr - padding - componentHeight;
+    const solarArrayY = centerY - componentHeight / 2;
+    
+    const wiringX = solarArrayX + componentWidth + componentSpacing;
+    const wiringY = centerY - componentHeight / 2;
+    
+    const inverterX = wiringX + componentWidth + componentSpacing;
+    const inverterY = centerY - componentHeight / 2;
+    
+    const loadX = inverterX + componentWidth + componentSpacing;
+    const loadY = centerY - componentHeight / 2;
 
     // Draw solar array
     drawComponent(
@@ -117,6 +134,19 @@ export default function SystemDiagram({
       componentHeight,
       "Solar Array",
       "#10b981", // emerald-500
+      isRunning,
+      animationFrame
+    );
+
+    // Draw wiring component
+    drawComponent(
+      ctx,
+      wiringX,
+      wiringY,
+      componentWidth,
+      componentHeight,
+      "Wiring",
+      "#6366f1", // indigo-500
       isRunning,
       animationFrame
     );
@@ -147,18 +177,7 @@ export default function SystemDiagram({
       animationFrame
     );
 
-    // Draw connection from solar array to inverter
-    const solarToInverterFlow = isRunning ? animationFrame / 60 : 0;
-    drawConnection(
-      ctx,
-      solarArrayX + componentWidth,
-      solarArrayY + componentHeight / 2,
-      inverterX,
-      inverterY + componentHeight / 2,
-      `DC: ${formatPowerOutput(((panelCount * panelEfficiency * 1.7 * 1000) / 1000))}`,
-      solarToInverterFlow
-    );
-
+    // Format power output helper
     function formatPowerOutput(power: number): string {
       if (power >= 1000) {
         return `${(power / 1000).toFixed(1)} MW`;
@@ -167,45 +186,83 @@ export default function SystemDiagram({
       }
     }
 
+    // Calculate power values
+    const totalDCPower = (panelCount * panelEfficiency * 1.7 * 1000) / 1000;
+    const powerAfterWiringLosses = totalDCPower * (1 - wiringLosses);
+    
+    // Draw connection from solar array to wiring
+    const solarToWiringFlow = isRunning ? animationFrame / 60 : 0;
+    drawConnection(
+      ctx,
+      solarArrayX + componentWidth,
+      solarArrayY + componentHeight / 2,
+      wiringX,
+      wiringY + componentHeight / 2,
+      `DC: ${formatPowerOutput(totalDCPower)}`,
+      solarToWiringFlow,
+      componentWidth
+    );
+
+    // Draw connection from wiring to inverter
+    const wiringToInverterFlow = isRunning ? animationFrame / 60 : 0;
+    drawConnection(
+      ctx,
+      wiringX + componentWidth,
+      wiringY + componentHeight / 2,
+      inverterX,
+      inverterY + componentHeight / 2,
+      `DC: ${formatPowerOutput(powerAfterWiringLosses)}`,
+      wiringToInverterFlow,
+      componentWidth
+    );
+
     // Draw connection from inverter to load
     const inverterToLoadFlow = isRunning ? animationFrame / 60 : 0;
     drawConnection(
       ctx,
-      inverterCenterX,
-      inverterY + componentHeight,
-      loadCenterX,
-      loadY,
+      inverterX + componentWidth,
+      inverterY + componentHeight / 2,
+      loadX,
+      loadY + componentHeight / 2,
       `AC: ${formatPowerOutput(currentOutput)}`,
-      inverterToLoadFlow
+      inverterToLoadFlow,
+      componentWidth
     );
 
-    // Draw component details
+    // Draw component details (below components)
     // Solar array details
     drawComponentDetails(ctx, solarArrayX, solarArrayY + componentHeight + 15, [
       `Panels: ${panelCount}`,
       `Efficiency: ${(panelEfficiency * 100).toFixed(1)}%`,
       `Area: ${(panelCount * 1.7).toFixed(1)} m²`,
-      `DC Output: ${((panelCount * panelEfficiency * 1.7 * 1000) / 1000).toFixed(1)} kW`
-    ]);
+      `DC Output: ${formatPowerOutput(totalDCPower)}`
+    ], componentWidth);
+
+    // Wiring details
+    drawComponentDetails(ctx, wiringX, wiringY + componentHeight + 15, [
+      `Wiring Loss: ${(wiringLosses * 100).toFixed(1)}%`,
+      `Power Loss: ${formatPowerOutput(totalDCPower * wiringLosses)}`,
+      `Efficiency: ${((1 - wiringLosses) * 100).toFixed(1)}%`
+    ], componentWidth);
 
     // Inverter details
     drawComponentDetails(ctx, inverterX, inverterY + componentHeight + 15, [
       `Efficiency: ${(inverterEfficiency * 100).toFixed(1)}%`,
-      `Wiring Loss: ${(wiringLosses * 100).toFixed(1)}%`,
       `DC→AC Conversion`,
-    ]);
+      `Power Loss: ${formatPowerOutput(powerAfterWiringLosses * (1 - inverterEfficiency))}`
+    ], componentWidth);
 
     // Load details
-    // drawComponentDetails(ctx, loadX, loadY - 70, [
-    //   `Current: ${currentOutput.toFixed(1)} kW`,
-    //   `Daily: ${(currentOutput * 24).toFixed(1)} kWh`,
-    //   `Annual: ${(currentOutput * 24 * 365 / 1000).toFixed(1)} MWh`
-    // ]);
+    drawComponentDetails(ctx, loadX, loadY + componentHeight + 15, [
+      `Current: ${formatPowerOutput(currentOutput)}`,
+      `Daily: ${formatPowerOutput(currentOutput * 24)}h`,
+      `Annual: ${(currentOutput * 24 * 365 / 1000).toFixed(1)} MWh`
+    ], componentWidth);
 
     // Add system status indicator
     drawStatusIndicator(
       ctx, 
-      canvas.width / dpr - padding, 
+      canvasWidth - padding, 
       padding / 2, 
       isRunning
     );
@@ -338,9 +395,11 @@ export default function SystemDiagram({
     x2: number,
     y2: number,
     label: string,
-    flowPosition: number
+    flowPosition: number,
+    componentWidth: number
   ) {
-    const lineWidth = 3;
+    // Responsive sizing
+    const lineWidth = Math.max(2, Math.min(3, componentWidth / 40));
     
     // Calculate line properties
     const dx = x2 - x1;
@@ -359,7 +418,8 @@ export default function SystemDiagram({
     // Draw animated flow particles if system is running
     if (flowPosition > 0) {
       // Draw flow particles
-      const particleCount = Math.floor(length / 30); // One particle every 30px
+      const particleSpacing = Math.max(20, length / 5); // Adaptive particle spacing
+      const particleCount = Math.floor(length / particleSpacing);
       
       for (let i = 0; i < particleCount; i++) {
         // Calculate particle position along the line
@@ -377,15 +437,16 @@ export default function SystemDiagram({
         ctx.shadowColor = "#60a5fa"; // blue-400
         ctx.shadowBlur = 8;
         
+        const particleWidth = Math.min(12, componentWidth / 10);
         ctx.fillStyle = "#60a5fa"; // blue-400
-        ctx.fillRect(-6, -lineWidth / 2, 12, lineWidth);
+        ctx.fillRect(-particleWidth/2, -lineWidth / 2, particleWidth, lineWidth);
         
         ctx.restore();
       }
     }
 
-    // Draw arrowhead
-    const arrowSize = 12;
+    // Draw arrowhead - scale with component size
+    const arrowSize = Math.min(12, componentWidth / 10);
 
     ctx.fillStyle = "#52525b"; // zinc-600
     ctx.beginPath();
@@ -401,56 +462,63 @@ export default function SystemDiagram({
     ctx.closePath();
     ctx.fill();
 
-    // Draw label
+    // Calculate positions for label
     const midX = (x1 + x2) / 2;
     const midY = (y1 + y2) / 2;
 
-    // Create a better label background
-    ctx.fillStyle = "#18181b"; // zinc-900
-    const textWidth = ctx.measureText(label).width;
-    const labelBgWidth = textWidth + 16;
-    const labelBgHeight = 24;
-
-    // Draw rounded rectangle for label with shadow
-    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    
-    roundRect(
-      ctx,
-      midX - labelBgWidth / 2,
-      midY - labelBgHeight / 2,
-      labelBgWidth,
-      labelBgHeight,
-      6
-    );
-    ctx.fill();
-    
-    // Reset shadow
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Draw label border
-    ctx.strokeStyle = "#27272a"; // zinc-800
-    ctx.lineWidth = 1;
-    roundRect(
-      ctx,
-      midX - labelBgWidth / 2,
-      midY - labelBgHeight / 2,
-      labelBgWidth,
-      labelBgHeight,
-      6
-    );
-    ctx.stroke();
-
-    // Draw label text
-    ctx.fillStyle = "#ffffff"; // white
-    ctx.font = "bold 12px Inter, system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, midX, midY);
+    // Only draw label if there's enough space
+    if (length > componentWidth / 2) {
+      // Responsive font size
+      const fontSize = Math.min(12, componentWidth / 10);
+      ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+      
+      // Create a better label background
+      ctx.fillStyle = "#18181b"; // zinc-900
+      const textWidth = ctx.measureText(label).width;
+      const labelBgWidth = textWidth + 16;
+      const labelBgHeight = fontSize + 12;
+      const labelYOffset = 15; // Distance from line
+      
+      // Draw rounded rectangle for label with shadow
+      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      roundRect(
+        ctx,
+        midX - labelBgWidth / 2,
+        midY - labelBgHeight / 2 - labelYOffset, // Moved up to not overlap with line
+        labelBgWidth,
+        labelBgHeight,
+        6
+      );
+      ctx.fill();
+      
+      // Reset shadow
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+  
+      // Draw label border
+      ctx.strokeStyle = "#27272a"; // zinc-800
+      ctx.lineWidth = 1;
+      roundRect(
+        ctx,
+        midX - labelBgWidth / 2,
+        midY - labelBgHeight / 2 - labelYOffset,
+        labelBgWidth,
+        labelBgHeight,
+        6
+      );
+      ctx.stroke();
+  
+      // Draw label text
+      ctx.fillStyle = "#ffffff"; // white
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, midX, midY - labelYOffset);
+    }
   }
 
   // Helper function to draw component details
@@ -458,11 +526,16 @@ export default function SystemDiagram({
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
-    details: string[]
-  ) {
-    // Create background for details panel
-    const lineHeight = 18;
-    const padding = 8;
+    details: string[],
+    componentWidth: number ) {
+    // Responsive font size and line height
+    const fontSize = Math.min(12, componentWidth / 10);
+    const lineHeight = fontSize + 6;
+    const padding = 6;
+    
+    // Set font before measuring
+    ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
+    
     const maxWidth = details.reduce((max, detail) => {
       const width = ctx.measureText(detail).width;
       return width > max ? width : max;
@@ -471,6 +544,9 @@ export default function SystemDiagram({
     const panelWidth = maxWidth + padding * 2;
     const panelHeight = details.length * lineHeight + padding * 2;
     
+    // Center the panel over the component
+    const centeredX = x + componentWidth / 2 - panelWidth / 2;
+    
     // Draw rounded rect background with subtle shadow
     ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
     ctx.shadowBlur = 4;
@@ -478,7 +554,7 @@ export default function SystemDiagram({
     ctx.shadowOffsetY = 1;
     
     ctx.fillStyle = "rgba(24, 24, 27, 0.8)"; // zinc-900 with opacity
-    roundRect(ctx, x - padding, y - padding, panelWidth, panelHeight, 6);
+    roundRect(ctx, centeredX - padding, y - padding, panelWidth, panelHeight, 6);
     ctx.fill();
     
     // Reset shadow
@@ -489,17 +565,17 @@ export default function SystemDiagram({
     // Draw border
     ctx.strokeStyle = "#3f3f46"; // zinc-700
     ctx.lineWidth = 1;
-    roundRect(ctx, x - padding, y - padding, panelWidth, panelHeight, 6);
+    roundRect(ctx, centeredX - padding, y - padding, panelWidth, panelHeight, 6);
     ctx.stroke();
 
     // Draw details text
     ctx.fillStyle = "#d4d4d8"; // zinc-300
-    ctx.font = "12px Inter, system-ui, sans-serif";
-    ctx.textAlign = "left";
+    ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "center";
     ctx.textBaseline = "top";
 
     details.forEach((detail, index) => {
-      ctx.fillText(detail, x, y + index * lineHeight);
+      ctx.fillText(detail, centeredX + panelWidth / 2 - padding, y + index * lineHeight);
     });
   }
 
@@ -538,7 +614,7 @@ export default function SystemDiagram({
     ctx.font = "bold 12px Inter, system-ui, sans-serif";
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelText, x - radius * 3, y);
+    ctx.fillText(labelText, x - radius * 4, y);
   }
 
   // Helper function to draw rounded rectangle

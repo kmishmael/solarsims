@@ -1,54 +1,113 @@
-# React + TypeScript + Vite
+# SolarSims - Solar Power Plant Simulator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SolarSims is a comprehensive web-based simulator for a large-scale solar power plant, providing an interactive interface to visualize, control, and monitor solar power generation in real-time with dynamic environmental conditions.
 
-Currently, two official plugins are available:
+> This project demonstrates a sophisticated simulation of solar power generation with realistic physics and environmental factors affecting energy production. This was was part of a school project.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+![Solar Simulator Dashboard](assets/landing-dashboard.png)
 
-## Expanding the ESLint configuration
+## Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 1. Real-time Solar Output Simulation
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+- Physically accurate modeling of solar panel performance based on sun position, time of day, and weather
+- Dynamic power generation calculations with realistic efficiency factors
+- Accurate representation of DC to AC power conversion through system components
+
+### 2. Comprehensive System Visualization
+
+- Interactive system diagram showing power flow from solar array through wiring and inverter to load
+- Animated power flow with real-time metrics at each conversion stage
+- Visual representation of losses and efficiencies throughout the system
+
+### 3. Environmental Factor Modeling
+
+- Sun intensity changes throughout the day following realistic patterns
+- Weather effects including cloud cover, temperature, and dust accumulation
+- Wind speed effects on panel cooling and efficiency
+
+### 4. Advanced Control Options
+
+- Manual or automatic time progression controls
+- Adjustable simulation speed from real-time to accelerated time
+- Interactive time-of-day slider with solar intensity curve
+
+### 5. System Configuration
+
+- Configurable solar array parameters (panel count, efficiency, angle)
+- Support for fixed panels or sun-tracking systems
+- Adjustable inverter efficiency and wiring losses
+
+### 6. Monitoring Dashboards
+
+- Real-time graphs showing power output and system efficiency
+- Historical data tracking and visualization
+- Comprehensive metrics display with key performance indicators
+
+### 7. Weather Patterns
+
+- Preset weather conditions (sunny, cloudy, rainy, windy, hot)
+- See immediate impact of changing conditions on power output
+
+### 8. System Status Tracking
+
+- Battery charge monitoring
+- Temperature and dust accumulation alerts
+- Comprehensive energy production statistics
+
+## Tech Stack
+
+- React with TypeScript for UI components
+- Tailwind CSS and shadcn/ui for styling
+- Zustand for state management
+- Canvas API for interactive visualizations
+- Recharts for data visualization
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v18.x or higher)
+- npm, yarn, or pnpm
+
+### Installation
+
+#### Install dependencies using your package manager of choice
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+#### Start the development server
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+```bash
+npm run dev
 ```
+
+### Usage
+
+The simulator provides a comprehensive interface to:
+
+1. Start/Stop the simulation
+2. Control time advancement (automatic or manual)
+3. Adjust parameters like panel count, efficiency, and orientation
+4. Monitor real-time data on power output, energy production, and system efficiency
+5. Visualize power flow through the system diagram
+6. Apply different weather patterns and see their effects
+7. Export simulation data for further analysis
+
+#### System Diagram with Power Flow
+
+![System Diagram](assets/system-diagram.png)
+
+#### Solar Intensity Simulation
+
+![Solar Intensity Curve](assets/solar-intensity.png)
+
+## Future Enhancements
+
+- Economic analysis tools (ROI, LCOE)
+- Geographic location selection with appropriate sun paths
+- Seasonal variations in solar patterns
+- Grid integration simulation
+- Detailed component failure analysis
